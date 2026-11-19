@@ -1,0 +1,65 @@
+name: Build
+
+# Builds and tests the language server and the VS Code extension, and keeps
+# the universal VSIX as an artifact of the run.
+#
+# The CRML compiler packages come from the GitHub Packages Maven repository of
+# PELAB-LiU/CRML. This repository's own GITHUB_TOKEN cannot read the packages
+# of another repository, unless they are public; then set the secret
+# CRML_PACKAGES_TOKEN to a classic token with read:packages.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    env:
+      GITHUB_ACTOR: ${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.CRML_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
+      with:
+          distribution: 'temurin'
+          java-version: '17'
+    - uses: actions/setup-node@v4
+      with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: editors/vscode/package-lock.json
+
+    - name: build and test the language server
+      run: ./gradlew build
+
+    - name: build and test the VS Code extension
+      working-directory: editors/vscode
+      run: |
+        npm ci
+        npm run build:server
+        npm test
+        npm run typecheck
+
+    - name: package the universal VS Code extension
+      working-directory: editors/vscode
+      run: npm run package
+
+    - name: upload the VS Code extension
+      uses: actions/upload-artifact@v4
+      with:
+        name: crml-vsix
+        path: editors/vscode/dist-vsix/*.vsix
+
+    - name: publish the test report
+      uses: mikepenz/action-junit-report@v3
+      if: always()
+      with:
+        report_paths: 'server/build/test-results/test/TEST-*.xml'

@@ -1,0 +1,3 @@
+*.crml linguist-language=Modelica
+gradlew text eol=lf
+*.bat text eol=crlf

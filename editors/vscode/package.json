@@ -1,0 +1,130 @@
+{
+  "name": "crml",
+  "displayName": "CRML",
+  "description": "Language support for CRML, the Common Requirement Modeling Language",
+  "version": "0.0.1",
+  "publisher": "openmodelica",
+  "license": "SEE LICENSE IN OSMC-License.txt",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PELAB-LiU/crml-lsp"
+  },
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "crml",
+        "aliases": [
+          "CRML",
+          "crml"
+        ],
+        "extensions": [
+          ".crml"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "semanticTokenTypes": [
+      {
+        "id": "userOperator",
+        "superType": "operator",
+        "description": "A user-defined CRML operator, such as 'during'."
+      }
+    ],
+    "configuration": {
+      "title": "CRML",
+      "properties": {
+        "crml.java.home": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "scope": "machine-overridable",
+          "markdownDescription": "Folder of the Java 11+ installation that runs the CRML language server. When unset, a Java runtime bundled with the extension, `JAVA_HOME` or the `PATH` is used."
+        },
+        "crml.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "scope": "window",
+          "description": "Logs the messages between VS Code and the CRML language server to its output channel."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "crml.restartLanguageServer",
+        "title": "Restart Language Server",
+        "category": "CRML"
+      }
+    ],
+    "configurationDefaults": {
+      "[crml]": {
+        "editor.semanticHighlighting.enabled": true,
+        "editor.quickSuggestions": {
+          "other": "off",
+          "comments": "off",
+          "strings": "off"
+        },
+        "editor.suggestOnTriggerCharacters": false,
+        "editor.wordBasedSuggestions": "off"
+      },
+      "editor.semanticTokenColorCustomizations": {
+        "[*Light*]": {
+          "rules": {
+            "keyword:crml": {
+              "foreground": "#800021",
+              "bold": true
+            },
+            "type:crml": "#1f3699",
+            "userOperator:crml": "#a55717",
+            "comment:crml": "#1f623d"
+          }
+        },
+        "[*Dark*]": {
+          "rules": {
+            "keyword:crml": {
+              "foreground": "#ec6a82",
+              "bold": true
+            },
+            "type:crml": "#7a9cff",
+            "userOperator:crml": "#e0954f",
+            "comment:crml": "#6abf8a"
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "generate": "node scripts/grammar.mjs && antlr-ng -Dlanguage=TypeScript --generate-listener false -o src/generated ../../server/build/grammar/crml.g4 && node scripts/grammar-info.mjs",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run generate && node esbuild.mjs",
+    "build:server": "node scripts/build-server.mjs",
+    "test": "npm run generate && node esbuild.mjs --test && node --test --enable-source-maps \"dist-test/**/*.test.js\"",
+    "package": "node scripts/package.mjs"
+  },
+  "dependencies": {
+    "antlr4ng": "3.0.16",
+    "vscode-languageclient": "10.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "~1.91.0",
+    "@vscode/vsce": "^4.0.0",
+    "antlr-ng": "1.0.10",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}
