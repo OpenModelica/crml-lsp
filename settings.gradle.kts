@@ -1,3 +1,13 @@
+// Plugins (shadow) from the Gradle Plugin Portal, their dependencies straight
+// from Maven Central: the portal only redirects to Central for those, and a
+// failed redirect shows up as "Could not find" for every one of them.
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 rootProject.name = "crml-lsp"
 
 include("server")
