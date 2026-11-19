@@ -57,22 +57,31 @@ tasks.test {
 
 // The CRML grammar, crml.g4, from the sources of the crml-language package the
 // server is built with, into build/grammar. The VS Code extension generates its
-// highlighting lexer from it, so both lexers come from the same grammar.
+// highlighting lexer from it, so both lexers come from the same grammar. With a
+// checkout of PELAB-LiU/CRML (see settings.gradle.kts), from its sources.
+val crmlCheckout = gradle.extra["crmlCheckout"] as File?
+
 val grammarSources by configurations.creating {
     isTransitive = false
 }
 
-dependencies {
-    grammarSources("org.openmodelica.crml:crml-language:$crmlVersion:sources")
+if (crmlCheckout == null) {
+    dependencies {
+        grammarSources("org.openmodelica.crml:crml-language:$crmlVersion:sources")
+    }
 }
 
 tasks.register<Sync>("grammar") {
     group = "build"
-    description = "Extracts crml.g4 of crml-language $crmlVersion into build/grammar."
-    from(grammarSources.elements.map { files -> files.map { zipTree(it) } }) {
-        include("**/crml.g4")
-        eachFile { path = name }
-        includeEmptyDirs = false
+    if (crmlCheckout == null) {
+        description = "Extracts crml.g4 of crml-language $crmlVersion into build/grammar."
+        from(grammarSources.elements.map { files -> files.map { zipTree(it) } })
+    } else {
+        description = "Copies crml.g4 of the CRML checkout in $crmlCheckout into build/grammar."
+        from(crmlCheckout.resolve("submodules/language/src/main/antlr"))
     }
+    include("**/crml.g4")
+    eachFile { path = name }
+    includeEmptyDirs = false
     into(layout.buildDirectory.dir("grammar"))
 }

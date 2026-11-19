@@ -53,8 +53,25 @@ npm run package                    # dist-vsix/crml-<version>.vsix, using the us
 npm run package -- --target linux-x64   # with a Java runtime bundled
 ```
 
-To develop the extension, open `editors/vscode` in VS Code and start
-*Run CRML extension* (F5).
+To develop the extension, open the repository or `editors/vscode` in VS Code
+and start *Run CRML extension* (F5).
+
+## Building with a CRML checkout
+
+To build against the CRML compiler's sources instead of its packages, for
+example to try compiler changes in the editor, put a checkout of
+PELAB-LiU/CRML in `CRML/` (a clone or a git submodule), or point the
+`crmlDir` property at one:
+
+```sh
+./gradlew build -PcrmlDir=../CRML
+export ORG_GRADLE_PROJECT_crmlDir=../CRML   # also for the npm scripts
+```
+
+Gradle then builds `crml-language` and `crml-model` from that checkout as a
+composite build, the extension's lexer comes from its `crml.g4`, and no GitHub
+Packages credentials are needed. Without a checkout, the packages of
+`crmlVersion` are used, as described below.
 
 ## The CRML compiler version
 
