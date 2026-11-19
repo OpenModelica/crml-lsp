@@ -1,7 +1,10 @@
 name: Build
 
 # Builds and tests the language server and the VS Code extension, and keeps
-# the universal VSIX as an artifact of the run.
+# the VS Code extension as artifacts of the run:
+#  - crml-vscode-universal: runs the server with the Java on the user's
+#    machine (11+);
+#  - crml-vscode-<platform>: with a Java runtime for that platform bundled.
 #
 # The CRML compiler packages come from the GitHub Packages Maven repository of
 # PELAB-LiU/CRML. This repository's own GITHUB_TOKEN cannot read the packages
@@ -52,14 +55,72 @@ jobs:
       working-directory: editors/vscode
       run: npm run package
 
-    - name: upload the VS Code extension
+    - name: upload the universal VS Code extension
       uses: actions/upload-artifact@v4
       with:
-        name: crml-vsix
+        name: crml-vscode-universal
         path: editors/vscode/dist-vsix/*.vsix
+        if-no-files-found: error
 
     - name: publish the test report
       uses: mikepenz/action-junit-report@v3
       if: always()
       with:
         report_paths: 'server/build/test-results/test/TEST-*.xml'
+
+  # The VS Code extension with a Java runtime for each platform, so that it
+  # needs no Java on the user's machine. scripts/package.mjs links the runtime
+  # with jlink from the Temurin jmods of the target, so every platform is built
+  # on Linux. The downloads are cached for a month; then the runtime is
+  # refreshed to the latest Java update.
+  package:
+
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      # Not win32-arm64: Adoptium has no Temurin 25 jmods for Windows on Arm,
+      # so there VS Code installs the universal package.
+      matrix:
+        target: [ linux-x64, linux-arm64, alpine-x64, darwin-x64, darwin-arm64, win32-x64 ]
+
+    env:
+      GITHUB_ACTOR: ${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.CRML_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
+      with:
+          distribution: 'temurin'
+          java-version: '17'
+    - uses: actions/setup-node@v4
+      with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: editors/vscode/package-lock.json
+
+    - name: month of the Java runtime
+      id: month
+      run: echo "month=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+
+    - name: cache the Temurin downloads
+      uses: actions/cache@v4
+      with:
+        path: editors/vscode/.cache/temurin
+        key: temurin-${{ matrix.target }}-${{ steps.month.outputs.month }}-${{ hashFiles('editors/vscode/scripts/package.mjs') }}
+
+    - name: package the VS Code extension for ${{ matrix.target }}
+      working-directory: editors/vscode
+      run: |
+        npm ci
+        npm run package -- --target ${{ matrix.target }}
+
+    - name: upload the VS Code extension for ${{ matrix.target }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: crml-vscode-${{ matrix.target }}
+        path: editors/vscode/dist-vsix/*.vsix
+        if-no-files-found: error
