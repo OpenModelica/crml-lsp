@@ -12,6 +12,7 @@ import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.DocumentSymbol;
+import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.junit.jupiter.api.Test;
@@ -129,9 +130,15 @@ class FeaturesTest {
     }
 
     @Test
-    void leavesCallsOfUnknownOperatorsUnresolved() {
-        // Not reported (yet): the front end leaves them as sequences.
-        assertEquals(1, unresolvedCalls("model M is ETL union {\n  Boolean b is 'nonsense' true;\n};").size());
+    void reportsCallsOfUnknownOperators() {
+        String text = "model M is ETL union {\n  Boolean b is 'nonsense' true;\n};";
+        assertEquals(1, unresolvedCalls(text).size());
+        List<Diagnostic> diagnostics = diagnose(text);
+        assertEquals(1, diagnostics.size(), diagnostics.toString());
+        assertEquals("OPERATOR_CALL", diagnostics.get(0).getCode().getLeft());
+        assertTrue(diagnostics.get(0).getMessage().getLeft().startsWith(Diagnostics.UNRESOLVED_CALL),
+            diagnostics.get(0).getMessage().getLeft());
+        assertEquals(new Range(new Position(1, 15), new Position(1, 25)), diagnostics.get(0).getRange());
     }
 
     @Test
@@ -171,6 +178,67 @@ class FeaturesTest {
                 }
             });
             return calls;
+        } finally {
+            ANALYZER.close(uri);
+        }
+    }
+
+    // ── Hover ────────────────────────────────────────────────
+
+    static final String SPEED = String.join("\n",
+        "model Speed is ETL union {",
+        "  // The measured speed, in m/s.",
+        "  Real v is external;",
+        "  Real {} limits is {6.0, 8.0};",
+        "  Boolean fast is v > 6.0;",
+        "  Boolean c is fast 'implies' (v > 8.0);",
+        "};");
+
+    @Test
+    void showsTheDeclarationOfAReferencedVariable() {
+        String hover = hover(SPEED, 4, 18); // v in v > 6.0
+        assertTrue(hover.startsWith("```crml\nReal v\n```"), hover);
+        assertTrue(hover.contains("The measured speed, in m/s."), hover);
+    }
+
+    @Test
+    void showsTheInferredTypeOfAnExpression() {
+        assertEquals("```crml\nBoolean\n```\n\nType of the expression", hover(SPEED, 4, 20)); // >
+        assertTrue(hover(SPEED, 3, 11).startsWith("```crml\nReal {} limits\n```"), hover(SPEED, 3, 11));
+    }
+
+    @Test
+    void showsTheOperatorOfACall() {
+        assertEquals("```crml\nTemplate b1 'implies' b2\n```\n\nLogical inference\n\nFrom ETL",
+            hover(SPEED, 5, 22)); // 'implies'
+    }
+
+    @Test
+    void showsTheOperatorAtEachOfItsKeywords() {
+        String text = String.join("\n",
+            "model Ticks is ETL union {",
+            "  Clock C1 is external;",
+            "  Period P1 is external;",
+            "  Integer i_count_ticks_of_c1_inside_p1 is 'count' C1 'inside' P1;",
+            "};");
+        String count = "```crml\nOperator [ Integer ] 'count' Clock C 'inside' Period P\n```";
+        assertTrue(hover(text, 3, 44).startsWith(count), hover(text, 3, 44)); // 'count'
+        assertTrue(hover(text, 3, 55).startsWith(count), hover(text, 3, 55)); // 'inside'
+        assertTrue(hover(text, 3, 52).startsWith("```crml\nClock C1\n```"), hover(text, 3, 52)); // C1
+    }
+
+    @Test
+    void showsNothingInCommentsAndBetweenTokens() {
+        assertEquals(null, hover(SPEED, 1, 8));
+        assertEquals(null, hover(SPEED, 4, 19)); // the blank between v and >
+    }
+
+    /** The hover text at a line and character of a text, or null. */
+    private static String hover(String text, int line, int character) {
+        String uri = "file:///test/Document.crml";
+        try {
+            Hover hover = ANALYZER.hover(uri, ParsedDocument.parse(text), new Position(line, character), true);
+            return hover == null ? null : hover.getContents().getRight().getValue();
         } finally {
             ANALYZER.close(uri);
         }

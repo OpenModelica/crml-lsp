@@ -13,8 +13,8 @@ rootProject.name = "crml-lsp"
 include("server")
 
 // A checkout of PELAB-LiU/CRML, if there is one, replaces the CRML packages:
-// crml-language and crml-model are then built from its sources, as a
-// composite build. It is looked for in CRML/ (e.g. a git submodule), or in the
+// crml-language, crml-model and crml-compiler (with the crml-modelica and
+// crml-util they use) are then built from its sources, as a composite build. It is looked for in CRML/ (e.g. a git submodule), or in the
 // folder the crmlDir property names, relative to this one (-PcrmlDir=../CRML,
 // or crmlDir in gradle.properties). Without it, the packages of version
 // crmlVersion come from GitHub Packages, as below.
@@ -26,6 +26,9 @@ if (crmlCheckout) {
         dependencySubstitution {
             substitute(module("org.openmodelica.crml:crml-language")).using(project(":language"))
             substitute(module("org.openmodelica.crml:crml-model")).using(project(":model"))
+            substitute(module("org.openmodelica.crml:crml-compiler")).using(project(":compiler"))
+            substitute(module("org.openmodelica.crml:crml-modelica")).using(project(":modelica"))
+            substitute(module("org.openmodelica.crml:crml-util")).using(project(":util"))
         }
     }
 }

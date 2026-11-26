@@ -17,12 +17,17 @@ import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
+import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.Position;
 import org.openmodelica.crml.language.workspace.CrmlDiagnostic;
 import org.openmodelica.crml.language.workspace.CrmlResource;
 import org.openmodelica.crml.language.workspace.CrmlWorkspace;
 import org.openmodelica.crml.language.workspace.RootHeader;
 import org.openmodelica.crml.language.workspace.SourceMap;
+import org.openmodelica.crml.compiler.crmlcv2.OMCv2;
+import org.openmodelica.crml.compiler.crmlcv2.TranslationResult;
+import org.openmodelica.crml.model.metamodel.Model;
 
 /**
  * Analyses CRML documents the way the compiler front end does, in one
@@ -100,6 +105,89 @@ public final class Analyzer {
         workspace.resolve();
         return CompletionEngine.complete(document, position, scopeAt(uri, resource, document, position),
             dependable(resource), support, documentation);
+    }
+
+    /**
+     * What hovering at {@code position} shows; null if nothing. The document
+     * is analysed as it is now, as for completion.
+     *
+     * @param markdown true if the client shows Markdown in hovers
+     */
+    public Hover hover(String uri, ParsedDocument document, Position position, boolean markdown) {
+        CrmlResource resource = workspace.load(URI.createURI(uri), document.text);
+        workspace.resolve();
+        return Hovers.at(resource, document, position, markdown);
+    }
+
+    /**
+     * Translates the document to Modelica, if it is a model without errors,
+     * as the compiler's command line does, but with the bundled libraries and
+     * the open documents in scope.
+     *
+     * @param within the package the generated class is placed in; empty or null for the top level
+     * @return what to write, or why not, and the diagnostics of the document,
+     *     those of the translation included
+     */
+    public Translations.Outcome translate(String uri, ParsedDocument document, String within) {
+        CrmlResource resource = workspace.load(URI.createURI(uri), document.text);
+        if (!document.errors.isEmpty()) {
+            return new Translations.Outcome(Translations.Result.refused(
+                "The file has syntax errors; fix them first."), Diagnostics.syntax(document));
+        }
+        workspace.resolve();
+        EObject root = resource.getRoot();
+        if (root != null) lastScopes.put(uri, ScopeSnapshot.at(root));
+        List<Diagnostic> diagnostics = Diagnostics.of(workspace.validate(resource), document);
+        if (diagnostics.stream().anyMatch(d -> d.getSeverity() == DiagnosticSeverity.Error)) {
+            return new Translations.Outcome(Translations.Result.refused(
+                "The model has errors; fix them first."), diagnostics);
+        }
+        if (!(root instanceof Model)) {
+            RootHeader header = resource.getHeader();
+            String what = header == null ? "The file" : header.name() + " is a " + header.kind() + ":";
+            return new Translations.Outcome(Translations.Result.refused(
+                what + " only a model can be translated to Modelica."), diagnostics);
+        }
+
+        TranslationResult translation;
+        try {
+            translation = new OMCv2().translateModel((Model) root);
+        } catch (RuntimeException | StackOverflowError e) {
+            return new Translations.Outcome(Translations.Result.refused("The translation failed: " + e
+                + ". This is likely a CRML compiler bug."), diagnostics);
+        } finally {
+            forgetTranslationErrors();
+        }
+        Translations.Result result = new Translations.Result();
+        result.translated = true;
+        result.modelName = ((Model) root).getName();
+        result.modelica = Translations.modelicaFile(within, translation.text());
+        result.runtimeLibrary = Translations.runtimeLibrary();
+        for (org.openmodelica.crml.compiler.crmlcv2.Diagnostic problem : translation.diagnostics()) {
+            boolean error = problem.severity() == org.openmodelica.crml.compiler.crmlcv2.Diagnostic.Severity.ERROR;
+            boolean warning = problem.severity() == org.openmodelica.crml.compiler.crmlcv2.Diagnostic.Severity.WARNING;
+            if (!Translations.inDocument(problem, resource)) {
+                if (error) result.errorsElsewhere++;
+            } else if (error) {
+                result.errors++;
+            } else if (warning) {
+                result.warnings++;
+            }
+        }
+        diagnostics.addAll(Translations.diagnostics(translation.diagnostics(), resource, document));
+        return new Translations.Outcome(result, diagnostics);
+    }
+
+    /**
+     * Removes the errors the translation recorded on the resources, the
+     * libraries' included: they are reported with the translation, and would
+     * otherwise stay with resources that are not reloaded.
+     */
+    private void forgetTranslationErrors() {
+        for (CrmlResource resource : workspace.resources()) {
+            resource.getErrors().removeIf(error -> error instanceof CrmlDiagnostic
+                && ((CrmlDiagnostic) error).getKind() == CrmlDiagnostic.Kind.TRANSLATION);
+        }
     }
 
     /**

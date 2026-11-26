@@ -188,7 +188,7 @@ final class ScopeSnapshot {
         return null;
     }
 
-    private static OperatorInfo operator(CustomOperator operator, EObject root) {
+    static OperatorInfo operator(CustomOperator operator, EObject root) {
         List<Part> header = new ArrayList<>();
         for (OperatorHeaderElement element : operator.getHeader()) {
             if (element instanceof Keyword) {
@@ -202,7 +202,7 @@ final class ScopeSnapshot {
             operator instanceof Template, source(operator, root));
     }
 
-    private static Source source(EObject declaration, EObject documentRoot) {
+    static Source source(EObject declaration, EObject documentRoot) {
         EObject declaringRoot = EcoreUtil.getRootContainer(declaration);
         String rootName = declaringRoot instanceof NamedEntity ? ((NamedEntity) declaringRoot).getName() : null;
         SourceMap map = SourceMap.of(declaration);

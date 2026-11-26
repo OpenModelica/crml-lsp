@@ -2,7 +2,7 @@
   "name": "crml",
   "displayName": "CRML",
   "description": "Language support for CRML, the Common Requirement Modeling Language",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "openmodelica",
   "license": "SEE LICENSE IN OSMC-License.txt",
   "private": true,
@@ -60,6 +60,18 @@
           "default": "off",
           "scope": "window",
           "description": "Logs the messages between VS Code and the CRML language server to its output channel."
+        },
+        "crml.translation.outputFolder": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "Folder the Modelica files are written to when translating, with `CRMLtoModelica.mo`, the library the generated code uses. Empty: next to the CRML file. A relative path is taken from the workspace folder of the CRML file."
+        },
+        "crml.translation.within": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "Package the generated Modelica classes are placed in, written as their `within` clause, e.g. `Requirements`. Empty: the top level."
         }
       }
     },
@@ -68,8 +80,43 @@
         "command": "crml.restartLanguageServer",
         "title": "Restart Language Server",
         "category": "CRML"
+      },
+      {
+        "command": "crml.translateToModelica",
+        "title": "Translate to Modelica",
+        "category": "CRML",
+        "icon": "$(play)"
       }
     ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "crml.translateToModelica",
+          "when": "resourceLangId == crml",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "crml.translateToModelica",
+          "when": "resourceLangId == crml",
+          "group": "1_crml"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "crml.translateToModelica",
+          "when": "resourceExtname == .crml",
+          "group": "navigation@90"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "crml.translateToModelica",
+          "when": "editorLangId == crml"
+        }
+      ]
+    },
     "configurationDefaults": {
       "[crml]": {
         "editor.semanticHighlighting.enabled": true,

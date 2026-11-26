@@ -2,10 +2,9 @@
 //
 // Simplified copy of testModels/libraries/ETL.crml of the CRML compiler
 // (PELAB-LiU/CRML, submodules/test-resources) that the current grammar
-// accepts. The operators are unchanged; the categories
-// are declared as Category name = { ... }; and their association with
-// 'decide' (Category {} C1 is associate increasing1 with 'decide') is left
-// out.
+// accepts. The operators are unchanged; the Category declarations are left
+// out, as the compiler reports them as not supported yet (they only served
+// the association of categories with 'decide', which is left out as well).
 
 library ETL is {
 	// Operators on Boolean
@@ -57,11 +56,5 @@ library ETL is {
 	Operator [ Boolean ] 'id' Boolean b = b;
 	Operator [ Boolean ] 'cte_false' Boolean b = false;
 	Operator [ Boolean ] 'cte_true' Boolean b = true;
-
-	Category increasing1 = { (>, >), (>=, >=), (<, >=), (<=, >), (==, >), (<>, >) };
-	Category increasing2 = { (>, >), (>=, >=), (<, >=), (<=, >) };
-	Category varying1 = { ('id', 'cte_false') };
-	Category varying2 = { ('id', 'cte_true') };
-
 };
 

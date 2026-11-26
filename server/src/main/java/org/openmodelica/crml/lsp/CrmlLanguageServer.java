@@ -2,6 +2,7 @@ package org.openmodelica.crml.lsp;
 
 import java.util.concurrent.CompletableFuture;
 
+import org.eclipse.lsp4j.CodeLensOptions;
 import org.eclipse.lsp4j.CompletionItemCapabilities;
 import org.eclipse.lsp4j.CompletionOptions;
 import org.eclipse.lsp4j.MarkupKind;
@@ -11,6 +12,7 @@ import org.eclipse.lsp4j.SemanticTokensWithRegistrationOptions;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.ServerInfo;
 import org.eclipse.lsp4j.TextDocumentSyncKind;
+import org.eclipse.lsp4j.jsonrpc.services.JsonRequest;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageClientAware;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -47,7 +49,10 @@ public class CrmlLanguageServer implements LanguageServer, LanguageClientAware {
         capabilities.setDocumentSymbolProvider(true);
         // Asked for explicitly (Ctrl+Space): no trigger characters.
         capabilities.setCompletionProvider(new CompletionOptions(true, null));
+        capabilities.setHoverProvider(true);
+        capabilities.setCodeLensProvider(new CodeLensOptions(false));
         documents.support(clientSupport(params));
+        documents.hoverMarkdown(hoverMarkdown(params));
         if (!option(params, CLIENT_HIGHLIGHTING)) {
             SemanticTokensWithRegistrationOptions tokens = new SemanticTokensWithRegistrationOptions(SemanticTokensProvider.LEGEND);
             tokens.setFull(true);
@@ -73,11 +78,30 @@ public class CrmlLanguageServer implements LanguageServer, LanguageClientAware {
             item.getDocumentationFormat() != null && item.getDocumentationFormat().contains(MarkupKind.MARKDOWN));
     }
 
+    /** True if the client shows Markdown in hovers, or does not say. */
+    private static boolean hoverMarkdown(InitializeParams params) {
+        if (params.getCapabilities() == null || params.getCapabilities().getTextDocument() == null
+            || params.getCapabilities().getTextDocument().getHover() == null
+            || params.getCapabilities().getTextDocument().getHover().getContentFormat() == null) {
+            return true;
+        }
+        return params.getCapabilities().getTextDocument().getHover().getContentFormat().contains(MarkupKind.MARKDOWN);
+    }
+
     private static boolean option(InitializeParams params, String name) {
         Object options = params.getInitializationOptions();
         if (!(options instanceof JsonObject)) return false;
         JsonElement value = ((JsonObject) options).get(name);
         return value != null && value.isJsonPrimitive() && value.getAsBoolean();
+    }
+
+    /**
+     * {@code crml/translate}: translates a CRML model to Modelica. The client
+     * writes the result; see {@link Translations}.
+     */
+    @JsonRequest(Translations.METHOD)
+    public CompletableFuture<Translations.Result> translate(Translations.Params params) {
+        return documents.translate(params);
     }
 
     @Override

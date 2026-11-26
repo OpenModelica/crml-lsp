@@ -2,6 +2,7 @@ package org.openmodelica.crml.lsp;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.antlr.v4.runtime.Token;
 import org.eclipse.emf.ecore.resource.Resource;
@@ -40,6 +41,26 @@ public final class Diagnostics {
     public static List<Diagnostic> of(org.eclipse.emf.common.util.Diagnostic validation, ParsedDocument document) {
         List<Diagnostic> diagnostics = new ArrayList<>();
         collect(validation, document, diagnostics);
+        return withoutFollowOnErrors(diagnostics);
+    }
+
+    /** The dependency problems that leave the operators of a dependency out of scope. */
+    private static final Set<String> DEPENDENCY_PROBLEMS = Set.of(
+        Kind.MISSING_DEPENDENCY.name(), Kind.BROKEN_DEPENDENCY.name(), Kind.AMBIGUOUS_DEPENDENCY.name());
+    /** How the front end starts an error for a call that no operator in scope matches. */
+    static final String UNRESOLVED_CALL = "Unresolved operator call ";
+
+    /**
+     * Without the calls no operator in scope matches if a dependency is
+     * missing or broken: the operators likely come from it, and the
+     * dependency's error already says what is wrong. Ambiguous calls stay.
+     */
+    private static List<Diagnostic> withoutFollowOnErrors(List<Diagnostic> diagnostics) {
+        boolean dependencyProblem = diagnostics.stream()
+            .anyMatch(d -> d.getCode() != null && DEPENDENCY_PROBLEMS.contains(d.getCode().getLeft()));
+        if (!dependencyProblem) return diagnostics;
+        diagnostics.removeIf(d -> d.getCode() != null && Kind.OPERATOR_CALL.name().equals(d.getCode().getLeft())
+            && d.getMessage().getLeft().startsWith(UNRESOLVED_CALL));
         return diagnostics;
     }
 
@@ -119,7 +140,7 @@ public final class Diagnostics {
         return "";
     }
 
-    private static Range nameRange(ParsedDocument document) {
+    static Range nameRange(ParsedDocument document) {
         if (document.tree.id() != null) {
             Token name = document.tree.id().getStart();
             return document.positions.range(name.getStartIndex(), name.getStopIndex() + 1);

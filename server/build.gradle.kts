@@ -8,6 +8,18 @@ val crmlVersion: String by project
 dependencies {
     implementation("org.openmodelica.crml:crml-language:$crmlVersion")
     implementation("org.openmodelica.crml:crml-model:$crmlVersion")
+    // For the translation to Modelica (crmlcv2): it needs only the object
+    // models, not what the compiler's command line, its OpenModelica scripts
+    // (Thymeleaf), its logging backend or its test reports use. Leaving them
+    // out keeps them out of the server jar; earlier snapshots of crml-compiler
+    // still listed the last three as runtime dependencies.
+    implementation("org.openmodelica.crml:crml-compiler:$crmlVersion") {
+        exclude(group = "org.thymeleaf")
+        exclude(group = "org.jcommander")
+        exclude(group = "org.apache.logging.log4j")
+        exclude(group = "com.aventstack")
+        exclude(group = "com.j2html")
+    }
     // Parsing for the editor uses the generated lexer and parser directly. The
     // version must be the one crml-language was generated with: the parser
     // checks it on load.

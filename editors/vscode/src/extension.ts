@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { LanguageClient } from "vscode-languageclient/node";
 import { lexicalTokens, TOKEN_TYPES } from "./lexical.js";
 import { startLanguageServer } from "./server.js";
+import { registerTranslation } from "./translate.js";
 
 const legend = new vscode.SemanticTokensLegend([...TOKEN_TYPES], []);
 
@@ -36,6 +37,7 @@ export function activate(context: vscode.ExtensionContext): void {
             output.show(true);
         }
     };
+    registerTranslation(context, () => client, output);
     context.subscriptions.push(vscode.commands.registerCommand("crml.restartLanguageServer", async () => {
         await client?.stop();
         client = undefined;

@@ -8,7 +8,11 @@ Language support for CRML, the Common Requirement Modeling Language.
   types, user-defined operators such as `'during'`, strings and comments. It
   works as soon as a file opens, without the language server.
 - **Errors** as you type: syntax errors on the offending token, and problems
-  found while building the model, such as names that cannot be resolved.
+  found while building the model, such as names that cannot be resolved and
+  operator calls that no operator in scope matches.
+- **Hover** information: the declared type and documentation of a variable,
+  the signature and documentation of the operator a call resolves to, and the
+  type the compiler infers for an expression, such as `Boolean` or `Real {}`.
 - **Outline** of models, classes, types, variables, operators and templates,
   also in the breadcrumbs and through *Go to Symbol in Editor* (`Ctrl+Shift+O`).
 - **Completion** with `Ctrl+Space`: what can be written at the cursor, also
@@ -28,6 +32,19 @@ Language support for CRML, the Common Requirement Modeling Language.
     declaration and the comment above it.
 
   Suggestions do not pop up while typing; ask for them with `Ctrl+Space`.
+- **Translate to Modelica**: the ▷ button of the editor title, *Translate to
+  Modelica* above `model … is`, the context menus of the editor and of `.crml`
+  files in the Explorer (also for several selected files), or *CRML: Translate
+  to Modelica* in the command palette.
+  - `Name.crml` is translated as the CRML compiler's command line does, but
+    with the bundled libraries and the open files in scope, and with unsaved
+    changes. `Name.mo` is written next to it, or to
+    `crml.translation.outputFolder`, and opens beside the model.
+  - `CRMLtoModelica.mo`, the Modelica library the generated code uses, is
+    written to the same folder, unless the same version is already there.
+  - Only a model without errors is translated. What could not be translated
+    is listed in *Problems*: elements of the model on the element; operators
+    of a library it uses, which are translated too, as warnings on its name.
 - Comment toggling, bracket matching and auto-closing pairs.
 
 ## Libraries
@@ -61,6 +78,8 @@ If no suitable Java is found, highlighting keeps working, and the
 |---|---|
 | `crml.java.home` | Folder of the Java 11+ installation to run the language server with. |
 | `crml.trace.server` | Logs the messages between VS Code and the language server: `off`, `messages` or `verbose`. |
+| `crml.translation.outputFolder` | Folder the Modelica files are written to. Empty: next to the CRML file; a relative path is taken from the workspace folder. |
+| `crml.translation.within` | Package the generated Modelica classes are placed in, as their `within` clause. Empty: the top level. |
 
 The command *CRML: Restart Language Server* restarts the server, for example
 after changing `crml.java.home`.

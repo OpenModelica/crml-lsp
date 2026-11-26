@@ -11,6 +11,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.lsp4j.CodeLens;
+import org.eclipse.lsp4j.CodeLensParams;
+import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionParams;
@@ -21,6 +24,8 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.DidSaveTextDocumentParams;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.DocumentSymbolParams;
+import org.eclipse.lsp4j.Hover;
+import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
 import org.eclipse.lsp4j.SemanticTokens;
 import org.eclipse.lsp4j.SemanticTokensParams;
@@ -49,6 +54,8 @@ public class CrmlTextDocumentService implements TextDocumentService {
     });
     private volatile LanguageClient client;
     private volatile CompletionEngine.ClientSupport support = CompletionEngine.ClientSupport.FULL;
+    /** True if the client shows Markdown in hovers. */
+    private volatile boolean hoverMarkdown = true;
     /** The documentation of the items of the last completion, by the id in their data. */
     private volatile Map<String, String> lastDocumentation = new HashMap<>();
     /** Made on the analysis thread, which alone uses it; loading the libraries takes a moment. */
@@ -60,6 +67,10 @@ public class CrmlTextDocumentService implements TextDocumentService {
 
     void support(CompletionEngine.ClientSupport support) {
         this.support = support;
+    }
+
+    void hoverMarkdown(boolean hoverMarkdown) {
+        this.hoverMarkdown = hoverMarkdown;
     }
 
     @Override
@@ -136,6 +147,71 @@ public class CrmlTextDocumentService implements TextDocumentService {
         String markdown = id == null ? null : lastDocumentation.get(id);
         if (markdown != null) item.setDocumentation(CompletionEngine.documentation(markdown, support));
         return CompletableFuture.completedFuture(item);
+    }
+
+    /** On the analysis thread, as completion: the document is analysed as it is now. */
+    @Override
+    public CompletableFuture<Hover> hover(HoverParams params) {
+        String uri = params.getTextDocument().getUri();
+        return CompletableFuture.supplyAsync(() -> {
+            ParsedDocument document = parsed(uri);
+            if (document == null) return null;
+            try {
+                return analyzer().hover(uri, document, params.getPosition(), hoverMarkdown);
+            } catch (RuntimeException e) {
+                System.err.println("Hover in " + uri + " failed:");
+                e.printStackTrace();
+                return null;
+            }
+        }, analysis);
+    }
+
+    /** The command of the extension that translates a document, which the code lens runs. */
+    static final String TRANSLATE_COMMAND = "crml.translateToModelica";
+
+    /**
+     * Above the name of a model, a code lens that translates it to Modelica.
+     * From the parse tree alone, so it shows at once, also while the model has
+     * errors; the translation then says what is wrong.
+     */
+    @Override
+    public CompletableFuture<List<? extends CodeLens>> codeLens(CodeLensParams params) {
+        List<CodeLens> lenses = new ArrayList<>();
+        String uri = params.getTextDocument().getUri();
+        ParsedDocument document = parsed(uri);
+        if (document != null && document.tree.definition_type() != null && document.tree.id() != null
+            && "model".equals(document.tree.definition_type().getText())) {
+            org.antlr.v4.runtime.Token name = document.tree.id().getStart();
+            Command command = new Command("$(play) Translate to Modelica", TRANSLATE_COMMAND, List.of(uri));
+            lenses.add(new CodeLens(document.positions.range(name.getStartIndex(), name.getStopIndex() + 1), command, null));
+        }
+        return CompletableFuture.completedFuture(lenses);
+    }
+
+    /**
+     * Translates a document to Modelica: the open one, or the text the
+     * client sends, e.g. of a file that is not open. Its diagnostics, those
+     * of the translation included, are published; a document that is not
+     * open is then forgotten again.
+     */
+    CompletableFuture<Translations.Result> translate(Translations.Params params) {
+        return CompletableFuture.supplyAsync(() -> {
+            String uri = params.uri;
+            String text = params.text != null ? params.text : open.get(uri);
+            if (uri == null || text == null) return Translations.Result.refused("There is no CRML text to translate.");
+            try {
+                Translations.Outcome outcome = analyzer().translate(uri, ParsedDocument.parse(text), params.within);
+                publish(uri, outcome.diagnostics);
+                return outcome.result;
+            } catch (RuntimeException e) {
+                System.err.println("Translation of " + uri + " failed:");
+                e.printStackTrace();
+                return Translations.Result.refused("The translation failed: " + e
+                    + ". This is likely a bug of the CRML language server.");
+            } finally {
+                if (!open.containsKey(uri)) analyzer().close(uri);
+            }
+        }, analysis);
     }
 
     @Override
