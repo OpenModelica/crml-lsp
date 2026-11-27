@@ -2,7 +2,7 @@
   "name": "crml",
   "displayName": "CRML",
   "description": "Language support for CRML, the Common Requirement Modeling Language",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "openmodelica",
   "license": "SEE LICENSE IN OSMC-License.txt",
   "private": true,
