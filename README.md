@@ -1,4 +1,4 @@
-# CRML language server and VS Code extension
+# [EXPERIMENTAL] CRML language server and VS Code extension
 
 Editor support for CRML, the Common Requirement Modeling Language:
 
@@ -84,7 +84,8 @@ and the extension always read CRML the same way.
 To move to a new compiler release, change `crmlVersion`, or try one first with
 `./gradlew build -PcrmlVersion=<version>`. The compiler's releases are the
 `maven-<version>` tags of PELAB-LiU/CRML; its branches publish snapshots such
-as `0.0.2-elephant-SNAPSHOT`.
+as `0.0.2
+-elephant-SNAPSHOT`.
 
 ## License
 
