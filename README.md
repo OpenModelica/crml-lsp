@@ -53,6 +53,10 @@ npm run package                    # dist-vsix/crml-<version>.vsix, using the us
 npm run package -- --target linux-x64   # with a Java runtime bundled
 ```
 
+The package is published as `openmodelica.crml`. To package it for another
+publisher, for example your own, set `CRML_PUBLISHER`:
+`CRML_PUBLISHER=<publisher> npm run package`.
+
 To develop the extension, open the repository or `editors/vscode` in VS Code
 and start *Run CRML extension* (F5).
 

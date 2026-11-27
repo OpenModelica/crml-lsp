@@ -77,12 +77,39 @@ if (target) {
     ]);
 }
 
-const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
+const manifestPath = join(root, "package.json");
+const manifestText = readFileSync(manifestPath, "utf8");
+const { version, publisher } = JSON.parse(manifestText);
 mkdirSync(join(root, "dist-vsix"), { recursive: true });
 const vsix = join(root, "dist-vsix", `crml-${version}${target ? `-${target}` : ""}.vsix`);
-run("npx", ["vsce", "package", "--no-dependencies", ...(target ? ["--target", target] : []), "--out", vsix]);
+withPublisher(process.env.CRML_PUBLISHER || publisher, () =>
+    run("npx", ["vsce", "package", "--no-dependencies", ...(target ? ["--target", target] : []), "--out", vsix]));
 rmSync(jre, { recursive: true, force: true });
 console.log(`${vsix}: ${(statSync(vsix).size / 1e6).toFixed(1)} MB`);
+
+/**
+ * Runs action with the publisher in package.json set to the given one, e.g. the
+ * CRML_PUBLISHER of a local build. The publisher is part of the extension ID
+ * (<publisher>.crml), and vsce takes it only from package.json, so it is
+ * written there for the action and then restored, also on failure or Ctrl+C.
+ */
+function withPublisher(newPublisher, action) {
+    if (newPublisher === publisher) return action();
+    const changed = manifestText.replace(/("publisher"\s*:\s*)"[^"]*"/, (_, key) => key + JSON.stringify(newPublisher));
+    if (JSON.parse(changed).publisher !== newPublisher) throw new Error("No publisher in package.json");
+    console.log(`Packaging for publisher ${newPublisher}`);
+    const restore = () => writeFileSync(manifestPath, manifestText);
+    // With a listener, a signal waits for vsce to end, and exiting runs restore.
+    const exit = () => process.exit(130);
+    process.on("exit", restore).on("SIGINT", exit).on("SIGTERM", exit);
+    try {
+        writeFileSync(manifestPath, changed);
+        return action();
+    } finally {
+        restore();
+        process.off("exit", restore).off("SIGINT", exit).off("SIGTERM", exit);
+    }
+}
 
 function hostPlatform() {
     const platform = `${process.platform}-${process.arch}`;

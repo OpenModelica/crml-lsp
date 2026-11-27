@@ -43,6 +43,7 @@ jobs:
     env:
       GITHUB_ACTOR: ${{ github.actor }}
       GITHUB_TOKEN: ${{ secrets.CRML_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+      CRML_PUBLISHER: openmodelica
 
     steps:
     - uses: actions/checkout@v7
@@ -106,6 +107,7 @@ jobs:
     env:
       GITHUB_ACTOR: ${{ github.actor }}
       GITHUB_TOKEN: ${{ secrets.CRML_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+      CRML_PUBLISHER: openmodelica
 
     steps:
     - uses: actions/checkout@v7
